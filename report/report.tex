@@ -1,0 +1,149 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{color}
+\usepackage{float}
+\usepackage{hyperref}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+
+\lstdefinestyle{mystyle}{
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    keepspaces=true,                 
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\title{Project Report - Advanced Programming for HPC}
+\author{[Thanh Do Nguyen - M23.ICT.003]}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+In this report, I present my implementation of the Kuwahara filter using CUDA parallel computing. I implemented three different versions of the filter: a basic GPU version without shared memory, an optimized version using shared memory, and a version with coalesced memory access. I will discuss the implementation details, optimizations, and performance analysis of each version.
+
+\section{Implementation Approach}
+
+\subsection{Basic Algorithm Understanding}
+Kuwahara filter works by dividing the image into four overlapping windows for each pixel. For each window of size \((w + 1) × (w + 1)\), I needed to:
+\begin{itemize}
+    \item Calculate the mean and standard deviation of pixel values
+    \item Select the window with the lowest standard deviation
+    \item Assign the mean value of the selected window to the output pixel
+\end{itemize}
+
+\subsection{CPU Implementation}
+I started with a CPU implementation as a baseline. In this version, I:
+\begin{itemize}
+    \item Convert the image from RGB to HSV color space
+    \item Process the V (brightness) channel using nested loops
+    \item Calculate statistics for each window using NumPy functions
+    \item Merge the channels back and convert to RGB
+\end{itemize}
+
+\subsection{Basic GPU Implementation}
+For my first GPU version, I focused on basic parallelization:
+\begin{itemize}
+    \item Assigned one thread per pixel
+    \item Used global memory for all operations
+    \item Implemented bounds checking to handle edge cases
+    \item Optimized thread block size to 16×16 for better occupancy
+\end{itemize}
+
+\subsection{Shared Memory Optimization}
+In the shared memory version, I made several optimizations:
+\begin{itemize}
+    \item Implemented a tiled approach using shared memory
+    \item Used a tile size of 24×24 to balance resources and performance
+    \item Carefully managed boundary conditions for tile loading
+    \item Synchronized threads using \_\_syncthreads() barriers
+\end{itemize}
+
+\subsection{Coalesced Memory Access}
+For my final optimization, I focused on memory access patterns:
+\begin{itemize}
+    \item Reorganized memory access to ensure coalescing
+    \item Optimized the order of operations in nested loops
+    \item Maintained aligned memory access patterns
+    \item Reduced memory transaction overhead
+\end{itemize}
+
+\section{Performance Analysis}
+
+\subsection{Test Configuration}
+I conducted tests with the following parameters:
+\begin{itemize}
+    \item Image size: 300×300 pixels
+    \item Window sizes: 3×3, 5×5, and 7×7
+    \item Number of runs: 3 (with warmup)
+\end{itemize}
+
+\subsection{Speedup Analysis}
+\subsubsection{Without-shared Memory vs CPU}
+My basic GPU implementation showed significant speedup over the CPU version:
+\begin{itemize}
+    \item 3×3 window: ∼18,000× speedup (CPU: 14.43s, GPU: 0.0008s)
+    \item 5×5 window: ∼16,000× speedup (CPU: 14.41s, GPU: 0.0009s)
+    \item 7×7 window: ∼12,000× speedup (CPU: 14.67s, GPU: 0.0012s)
+\end{itemize}
+
+\subsubsection{Shared Memory vs Without-shared Memory}
+The shared memory implementation showed modest improvements:
+\begin{itemize}
+    \item 3×3 window: ∼12.5\% improvement (0.0008s → 0.0007s)
+    \item 5×5 window: ∼11\% improvement (0.0009s → 0.0008s)
+    \item 7×7 window: No significant improvement
+\end{itemize}
+
+\subsubsection{Coalesced Access Impact}
+My coalesced access version showed similar performance to the shared memory version:
+\begin{itemize}
+    \item Similar execution times across all window sizes
+    \item Benefits might be more apparent with larger images
+    \item Memory transfer overhead dominates for small images
+\end{itemize}
+
+\section{Optimization Challenges}
+
+\subsection{Bank Conflicts}
+In my shared memory implementation, I addressed bank conflicts by:
+\begin{itemize}
+    \item Using a padding scheme in shared memory
+    \item Carefully organizing memory access patterns
+    \item Reducing sequential accesses to the same bank
+\end{itemize}
+
+\subsection{Memory Coalescing}
+I implemented coalesced memory access by:
+\begin{itemize}
+    \item Ensuring aligned memory accesses
+    \item Organizing thread blocks to maximize coalescence
+    \item Optimizing the memory access pattern in the inner loops
+\end{itemize}
+
+\section{Conclusion}
+Through my implementation of the Kuwahara filter, I achieved significant speedup using GPU acceleration. While the basic GPU implementation provided the most dramatic improvement over CPU, my additional optimizations using shared memory and coalesced access showed modest gains. The relatively small image size meant that memory transfer overhead dominated the execution time, potentially masking some optimization benefits.
+
+For future work, I will try to:
+\begin{itemize}
+    \item Test with larger images (When I have an NVIDIA GPU available, I will try because I have to use three Google accounts to complete this project and I still have a project required by Professor Lilian Aveneau)
+    \item Find out and fix the difference between the CPU version and the GPU versions
+\end{itemize}
+
+\end{document}
